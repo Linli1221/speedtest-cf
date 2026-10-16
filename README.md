@@ -219,6 +219,21 @@ Site URL: `https://YOUR-NAME.github.io/speedtest/`
 
 ---
 
+## Multiple mirrors and network blocking
+
+`config.json` accepts any number of entries in `download.files`; the UI turns them into a dropdown. On load the page **HEAD-probes every mirror in parallel and auto-selects the fastest reachable one**, so a blocked or throttled entry is skipped instead of breaking the test.
+
+This matters in mainland China: Cloudflare's free-plan proxied records sit on shared anycast ranges (`104.21.x`, `172.67.x`) that are frequently SNI-filtered or rate-limited, while `pub-*.r2.dev` and other Cloudflare ranges stay reachable. Symptom: `TCP/TLS timeout` or `schannel: failed to receive handshake` for the custom domain, while `curl https://speed.cloudflare.com/__down?bytes=25000000` is perfectly fast.
+
+Diagnosis recipe:
+
+```bash
+curl -o NUL -w '%{http_code} %{speed_download} B/s\n' --max-time 15 -H 'Range: bytes=0-1048575' https://YOUR-DOMAIN/big.bin
+curl -o NUL -w '%{http_code} %{speed_download} B/s\n' --max-time 15 https://speed.cloudflare.com/__down?bytes=25000000
+```
+
+If the first fails and the second succeeds, it is the hostname/route, not R2. Options: keep the `r2.dev` mirror as fallback, move the custom domain to a different Cloudflare zone, or put the payload behind a different CDN.
+
 ## Upload tests (optional)
 
 ```bash

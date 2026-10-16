@@ -58,6 +58,7 @@
       needConfig: '请先在 config.json 中配置测速文件地址',
       stopped: '已停止', done: '测速完成', single: '单连接', multi: '多连接',
       histClear: '历史记录已清空', dur: '时长', conn: '连接', progress: '已下载',
+      mirrorSwitch: '已自动切换到可用镜像：', mirrorNone: '所有镜像均不可达', mirrorKept: '当前镜像可用',
       diagUrl: '直链可访问', diagCors: 'CORS 允许跨域', diagRange: '支持 Range 分片',
       diagSize: '文件大小', diagTtfb: '首字节', diagRunning: '检测中…', diagFail: '检测失败',
       statusOk: '正常', statusBad: '异常', reqFail: '请求失败'
@@ -83,6 +84,7 @@
       needConfig: 'Configure a test file URL in config.json first',
       stopped: 'Stopped', done: 'Test complete', single: 'single', multi: 'multi',
       histClear: 'History cleared', dur: 'duration', conn: 'conn', progress: 'received',
+      mirrorSwitch: 'Auto-switched to reachable mirror: ', mirrorNone: 'No mirror reachable', mirrorKept: 'Current mirror reachable',
       diagUrl: 'Direct link reachable', diagCors: 'CORS allowed', diagRange: 'Range supported',
       diagSize: 'File size', diagTtfb: 'TTFB', diagRunning: 'checking...', diagFail: 'failed',
       statusOk: 'ok', statusBad: 'error', reqFail: 'request failed'
@@ -675,6 +677,48 @@
     return c ? num(c.textContent, fallback) : fallback;
   }
 
+  /* ------------------------------------------------------------ 镜像自动择优
+   * 同一份测速文件可以有多个入口（自定义域 / r2.dev / 其它 CDN）。
+   * 某些网络会针对性阻断某个入口，所以加载时并行探测，自动落到可达的那个。
+   * ------------------------------------------------------------------------*/
+  function probeMirror(file, index) {
+    var ctrl = new AbortController();
+    var to = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 7000);
+    var t0 = now();
+    return fetch(file.url, { method: 'HEAD', cache: 'no-store', credentials: 'omit', mode: 'cors', signal: ctrl.signal })
+      .then(function (res) {
+        clearTimeout(to);
+        return { index: index, ok: res.ok, ms: now() - t0, label: file.label || hostOf(file.url) };
+      })
+      .catch(function () {
+        clearTimeout(to);
+        return { index: index, ok: false, ms: Infinity, label: file.label || hostOf(file.url) };
+      });
+  }
+
+  function autoSelectMirror() {
+    var files = (CFG.download && CFG.download.files) || [];
+    var sel = byId('sourceSel');
+    if (files.length < 2 || !sel) return Promise.resolve(null);
+    var cur = sel.value | 0;
+    var jobs = files.map(function (f, i) { return probeMirror(f, i); });
+    return Promise.all(jobs).then(function (res) {
+      var healthy = res.filter(function (r) { return r.ok; })
+                       .sort(function (a, b) { return a.ms - b.ms; });
+      if (!healthy.length) { toast(t('mirrorNone')); return { switched: false, healthy: 0 }; }
+      var curOk = healthy.some(function (r) { return r.index === cur; });
+      var best = healthy[0];
+      if (!curOk) {
+        sel.value = String(best.index);
+        try { localStorage.setItem('st.source', String(best.index)); } catch (e) {}
+        refreshMeta();
+        runDiagnostics();
+        toast(t('mirrorSwitch') + best.label);
+      }
+      return { switched: !curOk, best: best.index, healthy: healthy.length };
+    });
+  }
+
   /* ------------------------------------------------------------------ 自检 */
   function diagRow(label, status, value) {
     var li = document.createElement('li');
@@ -1032,6 +1076,7 @@
       .then(function (cfg) {
         applyConfig(cfg);
         renderHistory();
+        autoSelectMirror();
         runDiagnostics();
         var intro = byId('footNote');
         if (intro) intro.textContent = (CFG.siteName || 'Speedtest') + ' · GitHub Pages + Cloudflare R2';
