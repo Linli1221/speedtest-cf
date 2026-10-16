@@ -21,7 +21,8 @@
       ],
       durationSec: 10,
       connections: 6,
-      chunkBytes: 8388608
+      chunkBytes: 4194304,
+      pipeline: 3
     },
     upload: {
       enabled: false,
@@ -386,17 +387,31 @@
     function onParentAbort() { hardStop(); }
     signal.addEventListener('abort', onParentAbort);
 
+    // Pipelining: keep K range requests in flight per connection so a high-RTT
+    // link never idles waiting for the next chunk header. Without this the
+    // measurement is RTT-bound instead of bandwidth-bound.
+    var K = clamp(cfg.pipeline | 0 || 1, 1, 8);
+
     function worker(idx) {
       var base = Math.floor(size * idx / conns);
       var limit = Math.floor(size * (idx + 1) / conns);
-      var offset = base;
-      function next() {
+      if (limit <= base) limit = Math.min(size, base + chunk);
+      var cursor = base;
+
+      function take() {
+        if (cursor >= limit) cursor = base;
+        var start = cursor;
+        var end = Math.min(start + chunk - 1, limit - 1);
+        cursor = end + 1;
+        return { start: start, end: end };
+      }
+
+      function chain() {
         if (stopped || !alive) return Promise.resolve();
-        var end = Math.min(offset + chunk - 1, limit - 1);
-        if (end < offset) { offset = base; end = Math.min(offset + chunk - 1, limit - 1); }
+        var rg = take();
         var reqStart = now();
         return fetch(url, {
-          headers: { Range: 'bytes=' + offset + '-' + end },
+          headers: { Range: 'bytes=' + rg.start + '-' + rg.end },
           cache: 'no-store',
           credentials: 'omit',
           mode: 'cors',
@@ -415,23 +430,24 @@
             return reader.read().then(function (r) {
               if (r.done) return null;
               total += r.value.byteLength;
-              if (!alive) { try { reader.cancel(); } catch (e) {} return null; }
+              if (stopped || !alive) { try { reader.cancel(); } catch (e) {} return null; }
               return pump();
             });
           }
           return pump();
         }).then(function () {
-          offset = end + 1;
-          if (offset >= limit) offset = base;
-          return next();
+          return chain();
         }).catch(function (err) {
           if (stopped || !alive || signal.aborted) return;
           errors++;
-          if (errors > conns * 40) { stopped = true; throw err; }
-          return new Promise(function (res) { setTimeout(res, 60); }).then(next);
+          if (errors > conns * K * 40) { stopped = true; throw err; }
+          return new Promise(function (res) { setTimeout(res, 60); }).then(chain);
         });
       }
-      return next();
+
+      var chains = [];
+      for (var k = 0; k < K; k++) chains.push(chain());
+      return Promise.all(chains);
     }
 
     var lastT = t0, lastB = 0;
@@ -846,7 +862,8 @@
 
       return measureDownload({
         url: f.url, sizeBytes: num(f.sizeBytes, 268435456),
-        durationSec: state.durSec, connections: conns, chunkBytes: CFG.download.chunkBytes
+        durationSec: state.durSec, connections: conns, chunkBytes: CFG.download.chunkBytes,
+        pipeline: CFG.download.pipeline
       }, signal, function (tick) {
         setGauge(tick.mbps, 'Mbps');
         setMetric('mDownload', fmtSpeed(tick.mbps));

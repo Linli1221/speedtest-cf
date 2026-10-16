@@ -19,7 +19,8 @@
     ],
     "durationSec": 10,
     "connections": 6,
-    "chunkBytes": 4194304
+    "chunkBytes": 4194304,
+    "pipeline": 3
   },
   "upload": {
     "enabled": false,
