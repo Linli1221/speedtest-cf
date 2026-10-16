@@ -219,6 +219,48 @@ Site URL: `https://YOUR-NAME.github.io/speedtest/`
 
 ---
 
+## Cloudflare 优选 IP（国内访问的关键）
+
+你的 R2 自定义域**本来就在 Cloudflare CDN 上**（有 `cf-cache-status: HIT` 就是证据）。国内访问慢/断，通常不是「没走 CDN」，而是**免费版分配给你的那两个共享 IP 被限速或阻断**了。
+
+Cloudflare 是 anycast：**任意一个边缘 IP 都能服务你的域名**（SNI/Host 匹配即可）。实测本机同一份文件、同一个桶：
+
+| 边缘 IP | 吞吐 |
+|---|---|
+| `104.21.84.16`（域名 DNS 当前解析） | 79 KB/s |
+| `172.66.0.1` | 189 KB/s |
+| `104.24.0.1` | **209.7 Mbps** |
+| `172.64.0.1` | 115.5 Mbps |
+
+差了两个数量级。用仓库自带的扫描器随时重新测：
+
+```bash
+node scripts/cf-ip-scan.mjs --host speedtest.linli.eu.org --big /speedtest-256mb.bin --bytes 8388608
+```
+
+### 用上优选 IP 的三种办法
+
+**1. 本地 hosts / 路由器 DNS（只对自己生效，最快）**
+
+```
+104.24.0.1 speedtest.linli.eu.org
+```
+
+**2. Worker 接管 + 灰云 A 记录（对所有访客生效）**
+
+R2 自定义域由 Cloudflare 托管那条 DNS 记录，不能手改，所以要换架构：
+
+1. 解绑 R2 自定义域
+2. 部署一个带 R2 binding 的 Worker，路由 `speedtest.linli.eu.org/*`，直接返回对象（自己控制 Range / CORS / 缓存头）
+3. DNS 加 **A 记录，灰云（DNS only）**，指向扫描出来的优选 IP
+4. 访客连的是优选 IP，边缘仍由 Cloudflare 出响应
+
+> 第 3 步「手动 A 记录指向 Cloudflare IP」是在利用 anycast 特性，属于灰色用法，Cloudflare 的 ToS 并不鼓励，自行权衡。
+
+**3. 换掉 Cloudflare**
+
+如果面向大量国内用户，免费版 Cloudflare 的国内可达性本来就时好时坏；方案 2 也只是把问题缓解，不是根治。
+
 ## Multiple mirrors and network blocking
 
 `config.json` accepts any number of entries in `download.files`; the UI turns them into a dropdown. On load the page **HEAD-probes every mirror in parallel and auto-selects the fastest reachable one**, so a blocked or throttled entry is skipped instead of breaking the test.
