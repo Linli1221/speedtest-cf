@@ -162,6 +162,15 @@ node scripts/r2-setup.mjs --domain speed.example.com --zone-id 0123456789abcdef
 
 > `r2.dev` is rate limited by Cloudflare and meant for development only. For a public speedtest, bind a custom domain.
 
+### Cached 404s (important)
+
+Cloudflare caches responses for R2 custom domains. If you request `https://speed.example.com/big.bin` **before** the object exists, that 404 is cached at the edge and keeps being served after the upload (`cf-cache-status: HIT`, growing `Age`). A `HEAD` returns 200 while a `GET` still returns the stale 404, which is confusing.
+
+Two fixes:
+
+1. **Version the URL** (what this repo does) — `r2-setup.mjs` appends `?v=<sha256-prefix>` to the URL in `config.json`, so a fresh key is used on every re-upload and the stale entry is never touched again. R2 ignores query strings when looking up the object key.
+2. **Purge the cache** — Cloudflare dashboard -> Caching -> Configuration -> Purge Cache -> Custom Purge, enter the URLs. Requires a token/role with *Cache Purge* permission; an R2-only token gets `401` from `POST /zones/{id}/purge_cache`.
+
 ### CORS policy explained
 
 ```jsonc

@@ -13,7 +13,7 @@
     "files": [
       {
         "label": "Cloudflare R2 · 256 MB",
-        "url": "https://speedtest.linli.eu.org/speedtest-256mb.bin",
+        "url": "https://speedtest.linli.eu.org/speedtest-256mb.bin?v=54c541de",
         "sizeBytes": 268435456
       }
     ],
