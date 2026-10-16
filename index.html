@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Speedtest · 网络测速</title>
+<meta name="description" content="纯前端多线程网络测速：下载 / 上传 / 延迟 / 抖动 / 负载延迟。测量文件 > 200MB，支持直链下载。" />
+<meta name="color-scheme" content="dark light" />
+<meta property="og:title" content="Speedtest · 网络测速" />
+<meta property="og:description" content="多线程下载 / 上传 / 延迟 / 抖动，测试文件 256MB 直链下载。" />
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+<link rel="preload" href="assets/style.css" as="style" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="./">
+    <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+      <defs><linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#a855f7"/>
+      </linearGradient></defs>
+      <circle cx="16" cy="16" r="13" fill="none" stroke="url(#bg1)" stroke-width="3" stroke-linecap="round" stroke-dasharray="62 20"/>
+      <path d="M10 19a7.5 7.5 0 0 1 12 0" fill="none" stroke="url(#bg1)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="16" cy="21" r="2.4" fill="url(#bg1)"/>
+    </svg>
+    <span class="brand-text"><b>Speedtest</b><i>CF · R2</i></span>
+  </a>
+  <nav class="topnav">
+    <span class="pill" id="hostPill" title="测速文件来源">—</span>
+    <button class="icon-btn" id="langBtn" title="切换语言 / Switch language">中文</button>
+    <a class="icon-btn" id="repoLink" href="#" target="_blank" rel="noopener" title="GitHub 仓库">GitHub</a>
+    <button class="icon-btn" id="themeBtn" title="切换主题">◐</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero card">
+    <div class="gauge">
+      <svg viewBox="0 0 320 200" class="gauge-svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#22d3ee"/>
+            <stop offset="55%" stop-color="#6366f1"/>
+            <stop offset="100%" stop-color="#f472b6"/>
+          </linearGradient>
+          <filter id="arcGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path class="gauge-track" d="M 30 160 A 130 130 0 0 1 290 160" />
+        <path id="gaugeArc" class="gauge-arc" d="M 30 160 A 130 130 0 0 1 290 160" filter="url(#arcGlow)" />
+        <g id="gaugeTicks" class="gauge-ticks"></g>
+        <line id="gaugeNeedle" class="gauge-needle" x1="160" y1="160" x2="160" y2="46" />
+        <circle class="gauge-hub" cx="160" cy="160" r="7" />
+      </svg>
+      <div class="gauge-readout">
+        <div class="readout-value"><span id="gaugeValue">0</span><em id="gaugeUnit">Mbps</em></div>
+        <div class="readout-phase" id="phaseText">准备就绪</div>
+      </div>
+    </div>
+
+    <div class="hero-actions">
+      <button class="btn primary big" id="startBtn">
+        <span class="btn-label">开始测速</span>
+        <span class="btn-spinner" hidden></span>
+      </button>
+      <button class="btn ghost" id="stopBtn" hidden>停止</button>
+      <button class="btn ghost" id="againBtn" hidden>再测一次</button>
+    </div>
+
+    <div class="hero-meta">
+      <span id="progressInfo">—</span>
+      <span class="dot-sep">·</span>
+      <span id="connInfo">—</span>
+      <span class="dot-sep">·</span>
+      <span id="durInfo">—</span>
+    </div>
+  </section>
+
+  <!-- ===================== METRIC CARDS ===================== -->
+  <section class="metrics">
+    <div class="card metric" data-metric="download">
+      <div class="metric-head"><svg viewBox="0 0 24 24" class="ic"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 19h16"/></svg><span data-i18n="m.download">下载</span></div>
+      <div class="metric-value"><span id="mDownload">—</span><em>Mbps</em></div>
+      <div class="metric-sub"><span id="mDownloadSub">—</span></div>
+    </div>
+    <div class="card metric" data-metric="upload">
+      <div class="metric-head"><svg viewBox="0 0 24 24" class="ic"><path d="M12 21V9m0 0 4.5 4.5M12 9l-4.5 4.5M4 5h16"/></svg><span data-i18n="m.upload">上传</span></div>
+      <div class="metric-value"><span id="mUpload">—</span><em>Mbps</em></div>
+      <div class="metric-sub"><span id="mUploadSub" data-i18n="m.uploadOff">未启用</span></div>
+    </div>
+    <div class="card metric" data-metric="ping">
+      <div class="metric-head"><svg viewBox="0 0 24 24" class="ic"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span data-i18n="m.ping">延迟</span></div>
+      <div class="metric-value"><span id="mPing">—</span><em>ms</em></div>
+      <div class="metric-sub"><span id="mPingSub">—</span></div>
+    </div>
+    <div class="card metric" data-metric="jitter">
+      <div class="metric-head"><svg viewBox="0 0 24 24" class="ic"><path d="M4 16c2.5-8 5-8 7.5 0S16 24 18.5 8"/></svg><span data-i18n="m.jitter">抖动</span></div>
+      <div class="metric-value"><span id="mJitter">—</span><em>ms</em></div>
+      <div class="metric-sub"><span id="mJitterSub">—</span></div>
+    </div>
+    <div class="card metric" data-metric="loaded">
+      <div class="metric-head"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h10M4 18h6"/></svg><span data-i18n="m.loaded">负载延迟</span></div>
+      <div class="metric-value"><span id="mLoaded">—</span><em>ms</em></div>
+      <div class="metric-sub"><span id="mLoadedSub">—</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== CHART ===================== -->
+  <section class="card chart-card">
+    <div class="card-head">
+      <h2 data-i18n="chart.title">实时速率</h2>
+      <div class="legend">
+        <span class="lg lg-dl"><i></i><span data-i18n="m.download">下载</span></span>
+        <span class="lg lg-ul"><i></i><span data-i18n="m.upload">上传</span></span>
+        <span class="lg lg-ping"><i></i><span data-i18n="m.ping">延迟</span></span>
+      </div>
+    </div>
+    <canvas id="chart" height="220"></canvas>
+  </section>
+
+  <!-- ===================== PANEL ===================== -->
+  <section class="grid2">
+    <div class="card">
+      <div class="card-head"><h2 data-i18n="panel.target">测速目标</h2></div>
+      <div class="field">
+        <label data-i18n="panel.source">测速文件</label>
+        <select id="sourceSel"></select>
+      </div>
+      <div class="field">
+        <label data-i18n="panel.duration">测试时长</label>
+        <div class="chips" id="durationChips" role="radiogroup"></div>
+      </div>
+      <div class="field">
+        <label data-i18n="panel.conns">并发连接数</label>
+        <div class="chips" id="connChips" role="radiogroup"></div>
+      </div>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="uploadToggle" /><span></span><b data-i18n="panel.uploadTest">包含上传测试</b></label>
+      </div>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="loadedToggle" checked /><span></span><b data-i18n="panel.loadedTest">测量负载延迟</b></label>
+      </div>
+      <p class="hint" id="cfgHint"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 data-i18n="diag.title">资源自检</h2>
+        <button class="btn tiny" id="diagBtn" data-i18n="diag.run">重新检测</button>
+      </div>
+      <ul class="diag" id="diagList"></ul>
+      <div class="file-actions">
+        <a class="btn primary" id="directDl" href="#" download data-i18n="dl.button">直接下载测试文件</a>
+        <button class="btn ghost" id="copyUrl" data-i18n="dl.copy">复制直链</button>
+      </div>
+      <p class="hint" id="fileHint"></p>
+    </div>
+  </section>
+
+  <!-- ===================== HISTORY ===================== -->
+  <section class="card">
+    <div class="card-head">
+      <h2 data-i18n="hist.title">历史记录</h2>
+      <button class="btn tiny" id="clearHist" data-i18n="hist.clear">清空</button>
+    </div>
+    <div class="table-wrap">
+      <table class="hist" id="histTable">
+        <thead><tr>
+          <th data-i18n="hist.time">时间</th>
+          <th data-i18n="m.download">下载</th>
+          <th data-i18n="m.upload">上传</th>
+          <th data-i18n="m.ping">延迟</th>
+          <th data-i18n="m.jitter">抖动</th>
+          <th data-i18n="m.loaded">负载延迟</th>
+          <th data-i18n="hist.source">来源</th>
+        </tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="histEmpty" data-i18n="hist.empty">暂无记录</p>
+  </section>
+
+  <section class="card note">
+    <h2 data-i18n="note.title">说明</h2>
+    <ul class="notelist">
+      <li data-i18n="note.1"></li>
+      <li data-i18n="note.2"></li>
+      <li data-i18n="note.3"></li>
+      <li data-i18n="note.4"></li>
+    </ul>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© <span id="year"></span> Speedtest</span>
+  <span class="dot-sep">·</span>
+  <span id="footNote">Static site on GitHub Pages</span>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

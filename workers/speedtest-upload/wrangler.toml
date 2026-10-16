@@ -1,0 +1,8 @@
+name = "speedtest-upload"
+main = "src/index.js"
+compatibility_date = "2025-09-23"
+workers_dev = true
+
+# 可选：设置上传令牌后，客户端必须带 Authorization: Bearer <TOKEN>
+# [vars]
+# TOKEN = "replace-me"

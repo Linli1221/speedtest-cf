@@ -1,0 +1,12 @@
+node_modules/
+public/
+tests/output/
+dist/
+.wrangler/
+.DS_Store
+Thumbs.db
+*.bin
+*.log
+.env
+.env.*
+!config.json

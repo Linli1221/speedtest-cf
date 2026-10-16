@@ -1,0 +1,39 @@
+{
+  "_help": {
+    "说明": "改完这个文件直接 git push 即可生效，站点无需重新构建。",
+    "download.files[].url": "测速文件的直链，必须支持 CORS 与 HTTP Range（Cloudflare R2 公共桶满足）。",
+    "download.files[].sizeBytes": "文件字节数，用于计算分片边界；脚本会自动写入。",
+    "latency.probeUrl": "可选：一个 1KB 左右的小文件直链，用于测量延迟，避免 Range 打大文件。留空则用 Range: bytes=0-0 打大文件。",
+    "upload": "上传测速需要先部署 workers/speedtest-upload，然后把 URL 填到这里并把 enabled 改成 true。"
+  },
+  "siteName": "Speedtest",
+  "repoUrl": "https://github.com/Linli1221/speedtest-cf",
+  "download": {
+    "enabled": true,
+    "files": [
+      {
+        "label": "Cloudflare R2 · 256 MB",
+        "url": "https://speedtest.linli.eu.org/speedtest-256mb.bin",
+        "sizeBytes": 268435456
+      }
+    ],
+    "durationSec": 10,
+    "connections": 6,
+    "chunkBytes": 4194304
+  },
+  "upload": {
+    "enabled": false,
+    "url": "https://speedtest-upload.YOUR-SUBDOMAIN.workers.dev/upload",
+    "token": "",
+    "durationSec": 8,
+    "connections": 3,
+    "chunkBytes": 4194304
+  },
+  "latency": {
+    "samples": 10,
+    "loadedSamples": 8,
+    "intervalMs": 450,
+    "probeUrl": "https://speedtest.linli.eu.org/ping.txt"
+  },
+  "historyLimit": 20
+}

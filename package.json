@@ -1,0 +1,19 @@
+{
+  "name": "speedtest-cf",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure front-end network speedtest. Site on GitHub Pages, >200MB test file on Cloudflare R2.",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "make": "node scripts/make-testfile.mjs",
+    "r2": "node scripts/r2-setup.mjs",
+    "publish": "node scripts/publish.mjs",
+    "test": "node tests/e2e.mjs"
+  },
+  "keywords": ["speedtest", "github-pages", "cloudflare-r2", "bandwidth"],
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "^1.49.1"
+  }
+}
